@@ -1,7 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.Data.SqlClient;
-using System.Data;
 using PortfolioApi.Models;
+using Npgsql;
 
 namespace PortfolioApi.Controllers
 {
@@ -21,30 +20,24 @@ namespace PortfolioApi.Controllers
         {
             try
             {
-                using (SqlConnection connection =
-                    new SqlConnection(
-                        _configuration.GetConnectionString("DefaultConnection")))
-                {
-                    SqlCommand command =
-                        new SqlCommand("SP_INSERT_LEAD", connection);
+                using var connection =
+                    new NpgsqlConnection(
+                        _configuration.GetConnectionString("DefaultConnection"));
 
-                    command.CommandType =
-                        CommandType.StoredProcedure;
+                await connection.OpenAsync();
 
-                    command.Parameters.AddWithValue("@Name", lead.Name);
-                    command.Parameters.AddWithValue("@Email", lead.Email);
-                    command.Parameters.AddWithValue("@Question", lead.Question);
+                string query =
+                    @"INSERT INTO leads(name,email,question)
+                      VALUES(@name,@email,@question)";
 
-                    await connection.OpenAsync();
-                    await command.ExecuteNonQueryAsync();
+                using var command =
+                    new NpgsqlCommand(query, connection);
 
-                   
-                   var emailService = new EmailService();
-                    await emailService.SendLeadEmail(
-                        lead.Name,
-                       lead.Email,
-                        lead.Question);
-                }
+                command.Parameters.AddWithValue("@name", lead.Name);
+                command.Parameters.AddWithValue("@email", lead.Email);
+                command.Parameters.AddWithValue("@question", lead.Question);
+
+                await command.ExecuteNonQueryAsync();
 
                 return Ok(new
                 {
@@ -53,48 +46,61 @@ namespace PortfolioApi.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new
-                {
-                    Message = "An error occurred while saving the lead.",
-                    Error = ex.Message
-                });
+                return StatusCode(500, ex.ToString());
             }
         }
 
         [HttpGet]
         public async Task<IActionResult> GetLeads()
         {
-            List<Lead> leads = new List<Lead>();
+            List<Lead> leads = new();
 
-            using (SqlConnection connection =
-                new SqlConnection(
-                    _configuration.GetConnectionString("DefaultConnection")))
+            using var connection =
+                new NpgsqlConnection(
+                    _configuration.GetConnectionString("DefaultConnection"));
+
+            await connection.OpenAsync();
+
+            string query =
+                "SELECT id,name,email,question FROM leads";
+
+            using var command =
+                new NpgsqlCommand(query, connection);
+
+            using var reader =
+                await command.ExecuteReaderAsync();
+
+            while (await reader.ReadAsync())
             {
-                SqlCommand command =
-                    new SqlCommand("SP_GET_LEADS", connection);
-
-                command.CommandType =
-                    CommandType.StoredProcedure;
-
-                await connection.OpenAsync();
-
-                using (SqlDataReader reader =
-                    await command.ExecuteReaderAsync())
+                leads.Add(new Lead
                 {
-                    while (await reader.ReadAsync())
-                    {
-                        leads.Add(new Lead
-                        {
-                            Id = Convert.ToInt32(reader["Id"]),
-                            Name = reader["Name"].ToString(),
-                            Email = reader["Email"].ToString(),
-                            Question = reader["Question"].ToString()
-                        });
-                    }
-                }
+                    Id = reader.GetInt32(0),
+                    Name = reader.GetString(1),
+                    Email = reader.GetString(2),
+                    Question = reader.GetString(3)
+                });
             }
 
             return Ok(leads);
+        }
+
+        [HttpGet("test-db")]
+        public async Task<IActionResult> TestDb()
+        {
+            try
+            {
+                using var connection =
+                    new NpgsqlConnection(
+                        _configuration.GetConnectionString("DefaultConnection"));
+
+                await connection.OpenAsync();
+
+                return Ok("Database Connected Successfully");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.ToString());
+            }
         }
     }
 }
