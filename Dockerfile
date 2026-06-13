@@ -1,12 +1,15 @@
-﻿using Microsoft.AspNetCore.Mvc;
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 
-namespace PortfolioApi
-{
-    public class Dockerfile : Controller
-    {
-        public IActionResult Index()
-        {
-            return View();
-        }
-    }
-}
+WORKDIR /src
+
+COPY . .
+
+RUN dotnet publish -c Release -o /app/publish
+
+FROM mcr.microsoft.com/dotnet/aspnet:8.0
+
+WORKDIR /app
+
+COPY --from=build /app/publish .
+
+ENTRYPOINT ["dotnet", "PortfolioApi.dll"]
