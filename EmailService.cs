@@ -3,50 +3,73 @@ using MailKit.Security;
 using Microsoft.Extensions.Configuration;
 using MimeKit;
 
-public class EmailService
+namespace PortfolioApi
 {
-    private readonly IConfiguration _configuration;
-
-    public EmailService(IConfiguration configuration)
+    public class EmailService
     {
-        _configuration = configuration;
-    }
+        private readonly IConfiguration _configuration;
 
-    public async Task SendLeadEmail(string name, string email, string question)
-    {
-        var senderEmail = _configuration["EmailSettings:Email"];
-        var senderPassword = _configuration["EmailSettings:Password"];
-        var host = _configuration["EmailSettings:Host"];
-        var port = int.Parse(_configuration["EmailSettings:Port"]);
-
-        var message = new MimeMessage();
-
-        message.From.Add(MailboxAddress.Parse(senderEmail));
-        message.To.Add(MailboxAddress.Parse(senderEmail));
-
-        message.Subject = "New Portfolio Lead";
-
-        message.Body = new TextPart("plain")
+        public EmailService(IConfiguration configuration)
         {
-            Text =
-$@"New Lead Received
+            _configuration = configuration;
+        }
 
-Name: {name}
+        public async Task SendLeadEmail(
+            string name,
+            string email,
+            string question)
+        {
+            var senderEmail =
+                _configuration["EmailSettings:Email"];
 
-Email: {email}
+            var senderPassword =
+                _configuration["EmailSettings:Password"];
 
-Question:
-{question}"
-        };
+            var host =
+                _configuration["EmailSettings:Host"];
 
-        using var smtp = new SmtpClient();
+            var port =
+                int.Parse(_configuration["EmailSettings:Port"]);
 
-        await smtp.ConnectAsync(host, port, SecureSocketOptions.StartTls);
+            var message = new MimeMessage();
 
-        await smtp.AuthenticateAsync(senderEmail, senderPassword);
+            message.From.Add(
+                MailboxAddress.Parse(senderEmail));
 
-        await smtp.SendAsync(message);
+            message.To.Add(
+                MailboxAddress.Parse(senderEmail));
 
-        await smtp.DisconnectAsync(true);
+            message.Subject = "New Portfolio Lead";
+
+            message.Body = new TextPart("plain")
+            {
+                Text = $@"
+New Portfolio Lead
+
+Name : {name}
+
+Email : {email}
+
+Question :
+
+{question}
+"
+            };
+
+            using var smtp = new SmtpClient();
+
+            await smtp.ConnectAsync(
+                host,
+                port,
+                SecureSocketOptions.StartTls);
+
+            await smtp.AuthenticateAsync(
+                senderEmail,
+                senderPassword);
+
+            await smtp.SendAsync(message);
+
+            await smtp.DisconnectAsync(true);
+        }
     }
 }
