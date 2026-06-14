@@ -39,7 +39,6 @@ namespace PortfolioApi.Controllers
 
                 await command.ExecuteNonQueryAsync();
 
-                // Send Email
                 var emailService = new EmailService(_configuration);
 
                 await emailService.SendLeadEmail(
