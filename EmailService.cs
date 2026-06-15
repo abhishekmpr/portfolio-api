@@ -1,75 +1,72 @@
-﻿using MailKit.Net.Smtp;
-using MailKit.Security;
-using Microsoft.Extensions.Configuration;
-using MimeKit;
+﻿using System.Text;
+using System.Text.Json;
 
 namespace PortfolioApi
 {
     public class EmailService
     {
         private readonly IConfiguration _configuration;
+        private readonly HttpClient _httpClient;
 
-        public EmailService(IConfiguration configuration)
+        public EmailService(IConfiguration configuration,
+                            HttpClient httpClient)
         {
             _configuration = configuration;
+            _httpClient = httpClient;
         }
 
-        public async Task SendLeadEmail(
-            string name,
-            string email,
-            string question)
+        public async Task SendLeadEmail(string name,
+                                        string email,
+                                        string question)
         {
-            var senderEmail =
-                _configuration["EmailSettings:Email"];
+            var apiKey = _configuration["Resend:ApiKey"];
 
-            var senderPassword =
-                _configuration["EmailSettings:Password"];
+            _httpClient.DefaultRequestHeaders.Clear();
 
-            var host =
-                _configuration["EmailSettings:Host"];
+            _httpClient.DefaultRequestHeaders.Add(
+                "Authorization",
+                $"Bearer {apiKey}");
 
-            var port =
-                int.Parse(_configuration["EmailSettings:Port"]);
-
-            var message = new MimeMessage();
-
-            message.From.Add(
-                MailboxAddress.Parse(senderEmail));
-
-            message.To.Add(
-                MailboxAddress.Parse(senderEmail));
-
-            message.Subject = "New Portfolio Lead";
-
-            message.Body = new TextPart("plain")
+            var body = new
             {
-                Text = $@"
-New Portfolio Lead
+                from = "onboarding@resend.dev",
 
-Name : {name}
+                to = new[]
+                {
+                    "aaabhishekmishra123@gmail.com"
+                },
 
-Email : {email}
+                subject = "🚀 New Portfolio Lead",
 
-Question :
+                html = $@"
+                    <h2>New Portfolio Lead</h2>
 
-{question}
-"
+                    <p><b>Name:</b> {name}</p>
+
+                    <p><b>Email:</b> {email}</p>
+
+                    <p><b>Question:</b></p>
+
+                    <p>{question}</p>"
             };
 
-            using var smtp = new SmtpClient();
+            var json = JsonSerializer.Serialize(body);
 
-            await smtp.ConnectAsync(
-                host,
-                port,
-                SecureSocketOptions.StartTls);
+            var response = await _httpClient.PostAsync(
+                "https://api.resend.com/emails",
+                new StringContent(
+                    json,
+                    Encoding.UTF8,
+                    "application/json"));
 
-            await smtp.AuthenticateAsync(
-                senderEmail,
-                senderPassword);
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = await response.Content.ReadAsStringAsync();
 
-            await smtp.SendAsync(message);
+                throw new Exception($"Resend Error: {error}");
+            }
 
-            await smtp.DisconnectAsync(true);
+            Console.WriteLine("Email sent successfully.");
         }
     }
 }

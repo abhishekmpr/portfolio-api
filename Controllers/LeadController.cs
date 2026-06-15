@@ -9,10 +9,12 @@ namespace PortfolioApi.Controllers
     public class LeadController : ControllerBase
     {
         private readonly IConfiguration _configuration;
+        private readonly EmailService _emailService;
 
-        public LeadController(IConfiguration configuration)
+        public LeadController( IConfiguration configuration,EmailService emailService)
         {
             _configuration = configuration;
+            _emailService = emailService;
         }
 
         [HttpPost]
@@ -37,12 +39,9 @@ namespace PortfolioApi.Controllers
 
                 await command.ExecuteNonQueryAsync();
 
-                // Send email (don't fail the request if email fails)
                 try
                 {
-                    var emailService = new EmailService(_configuration);
-
-                    await emailService.SendLeadEmail(
+                    await _emailService.SendLeadEmail(
                         lead.Name,
                         lead.Email,
                         lead.Question);
