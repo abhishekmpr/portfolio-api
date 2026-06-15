@@ -20,18 +20,16 @@ namespace PortfolioApi.Controllers
         {
             try
             {
-                using var connection =
-                    new NpgsqlConnection(
-                        _configuration.GetConnectionString("DefaultConnection"));
+                using var connection = new NpgsqlConnection(
+                    _configuration.GetConnectionString("DefaultConnection"));
 
                 await connection.OpenAsync();
 
-                string query =
-                    @"INSERT INTO leads(name,email,question)
-                      VALUES(@name,@email,@question)";
+                string query = @"
+                    INSERT INTO leads(name,email,question)
+                    VALUES(@name,@email,@question)";
 
-                using var command =
-                    new NpgsqlCommand(query, connection);
+                using var command = new NpgsqlCommand(query, connection);
 
                 command.Parameters.AddWithValue("@name", lead.Name);
                 command.Parameters.AddWithValue("@email", lead.Email);
@@ -39,12 +37,20 @@ namespace PortfolioApi.Controllers
 
                 await command.ExecuteNonQueryAsync();
 
-                var emailService = new EmailService(_configuration);
+                // Send email (don't fail the request if email fails)
+                try
+                {
+                    var emailService = new EmailService(_configuration);
 
-                await emailService.SendLeadEmail(
-                    lead.Name,
-                    lead.Email,
-                    lead.Question);
+                    await emailService.SendLeadEmail(
+                        lead.Name,
+                        lead.Email,
+                        lead.Question);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.ToString());
+                }
 
                 return Ok(new
                 {
@@ -62,20 +68,16 @@ namespace PortfolioApi.Controllers
         {
             List<Lead> leads = new();
 
-            using var connection =
-                new NpgsqlConnection(
-                    _configuration.GetConnectionString("DefaultConnection"));
+            using var connection = new NpgsqlConnection(
+                _configuration.GetConnectionString("DefaultConnection"));
 
             await connection.OpenAsync();
 
-            string query =
-                "SELECT id,name,email,question FROM leads";
+            string query = "SELECT id,name,email,question FROM leads";
 
-            using var command =
-                new NpgsqlCommand(query, connection);
+            using var command = new NpgsqlCommand(query, connection);
 
-            using var reader =
-                await command.ExecuteReaderAsync();
+            using var reader = await command.ExecuteReaderAsync();
 
             while (await reader.ReadAsync())
             {
@@ -96,9 +98,8 @@ namespace PortfolioApi.Controllers
         {
             try
             {
-                using var connection =
-                    new NpgsqlConnection(
-                        _configuration.GetConnectionString("DefaultConnection"));
+                using var connection = new NpgsqlConnection(
+                    _configuration.GetConnectionString("DefaultConnection"));
 
                 await connection.OpenAsync();
 
